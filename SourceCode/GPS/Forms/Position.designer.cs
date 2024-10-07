@@ -117,10 +117,13 @@ namespace AgOpenGPS
         {
             //swFrame.Stop();
             //Measure the frequency of the GPS updates
+
+//1. Medicion de la frecuencia GPS
             timeSliceOfLastFix = (double)(swFrame.ElapsedTicks) / (double)System.Diagnostics.Stopwatch.Frequency;
             swFrame.Reset();
             swFrame.Start();
 
+//2. Aplicar filtro para suavizar frecuencia
             //get Hz from timeslice
             nowHz = 1 / timeSliceOfLastFix;
             if (nowHz > 70) nowHz = 70;
@@ -132,36 +135,46 @@ namespace AgOpenGPS
             //Initialization counter
             startCounter++;
 
+//3. Inicializacion de las Posiciones GPS
             if (!isGPSPositionInitialized)
             {
                 InitializeFirstFewGPSPositions();
                 return;
             }
 
+//4. Calculo de Velocidad y Promediar
             pn.speed = pn.vtgSpeed;
             pn.AverageTheSpeed();
 
+// REGION HEADING --------------------------------------------------------------------------------------------------------
             #region Heading
+
+// (field) string FormGPS.headingFromSource --> FIX - VTG - DUAL
             switch (headingFromSource)
             {               
                 //calculate current heading only when moving, otherwise use last
+
+// Si headingFromSource es igual a FIX
                 case "Fix":
                     {
+// REGION START --------------------------------------------------------------------------------------------------------
                         #region Start
-
+//Calculo de Distancia desde la Última Fix
                         distanceCurrentStepFixDisplay = glm.Distance(prevDistFix, pn.fix);
                         if ((fd.distanceUser += distanceCurrentStepFixDisplay) > 999) fd.distanceUser = 0;
                         distanceCurrentStepFixDisplay *= 100;
 
                         prevDistFix = pn.fix;
 
+//Condicion para determinar si se esta moviendo
                         if (Math.Abs(avgSpeed) < 1.5 && !isFirstHeadingSet)
                             goto byPass;
 
+//Primera direccion
                         if (!isFirstHeadingSet) //set in steer settings, Stanley
                         {
                             prevFix.easting = stepFixPts[0].easting; prevFix.northing = stepFixPts[0].northing;
-
+//Calculos rumbo inicial
                             if (stepFixPts[2].isSet == 0)
                             {
                                 //this is the first position no roll or offset correction
@@ -188,7 +201,7 @@ namespace AgOpenGPS
                                 stepFixPts[0].easting = pn.fix.easting;
                                 stepFixPts[0].northing = pn.fix.northing;
                                 stepFixPts[0].isSet = 1;
-
+//6. Correccion de direccion con IMU
                                 gpsHeading = Math.Atan2(pn.fix.easting - stepFixPts[2].easting,
                                     pn.fix.northing - stepFixPts[2].northing);
 
@@ -237,6 +250,7 @@ namespace AgOpenGPS
                                 //set the camera 
                                 camHeading = glm.toDegrees(gpsHeading);
 
+//7. Calculo de Offset de la Antena y correccion
                                 //now we have a heading, fix the first 3
                                 if (vehicle.antennaOffset != 0)
                                 {
@@ -275,7 +289,8 @@ namespace AgOpenGPS
                             }
                         }
                         #endregion
-
+// FIN REGION START ----------------------------------------------------------------------------------------------------
+// REGION OFFSET ROLL ----------------------------------------------------------------------------------------------------
                         #region Offset Roll
                         if (vehicle.antennaOffset != 0)
                         {
@@ -297,7 +312,9 @@ namespace AgOpenGPS
                         }
 
                         #endregion
-
+// FIN OFFSET ROLL ----------------------------------------------------------------------------------------------------
+// REGION FIX HEADING ----------------------------------------------------------------------------------------------------
+// Calcula distancia actual desde el ultimo FIX
                         #region Fix Heading
 
                         //imu on board
@@ -327,9 +344,11 @@ namespace AgOpenGPS
                                 }
                             }
 
+//Condicion para la correccion del rumbo
                             if (fixToFixHeadingDistance < (minFixHeadingDistSquared * 0.5))
                                 goto byPass;
 
+//10. Calcula GPS HEADING
                             double newGPSHeading = Math.Atan2(pn.fix.easting - stepFixPts[currentStepFix].easting,
                                                     pn.fix.northing - stepFixPts[currentStepFix].northing);
                             if (newGPSHeading < 0) newGPSHeading += glm.twoPI;
@@ -370,6 +389,7 @@ namespace AgOpenGPS
                             else if (newGPSHeading >= glm.twoPI) newGPSHeading -= glm.twoPI;
 
                             gpsHeading = newGPSHeading;
+//IMU Fusion
 
                             #region IMU Fusion
 
@@ -427,6 +447,7 @@ namespace AgOpenGPS
                             if (distanceCurrentStepFix < (gpsMinimumStepDistance))
                                 goto byPass;
 
+//9. Calculo nuevo rumbo
                             double minFixHeadingDistSquared = minHeadingStepDist * minHeadingStepDist;
                             fixToFixHeadingDistance = 0;
 
@@ -448,6 +469,7 @@ namespace AgOpenGPS
                                                     pn.fix.northing - stepFixPts[currentStepFix].northing);
                             if (newGPSHeading < 0) newGPSHeading += glm.twoPI;
 
+// Condicion modo RESERVA ???
                             if (ahrs.isReverseOn)
                             {
 
@@ -501,6 +523,7 @@ namespace AgOpenGPS
                             fixHeading = gpsHeading = newGPSHeading;
                         }
 
+// Guardado rumbo actual FIX
                         //save current fix and set as valid
                         for (int i = totalFixSteps - 1; i > 0; i--) stepFixPts[i] = stepFixPts[i - 1];
                         stepFixPts[0].easting = pn.fix.easting;
@@ -508,7 +531,8 @@ namespace AgOpenGPS
                         stepFixPts[0].isSet = 1;
 
                         #endregion
-
+// FIN REGION FIX HEADING ----------------------------------------------------------------------------------------------------
+// REGION CAMERA ----------------------------------------------------------------------------------------------------
                         #region Camera
 
                         double camDelta = fixHeading - smoothCamHeading;
@@ -534,10 +558,12 @@ namespace AgOpenGPS
                         camHeading = glm.toDegrees(smoothCamHeading);
 
                     #endregion
-
+// FIN REGION CAMERA ----------------------------------------------------------------------------------------------------
 
                     //Calculate a million other things
                     byPass:
+
+//Fusion IMU
                         if (ahrs.imuHeading != 99999)
                         {
                             imuCorrected = (glm.toRadians(ahrs.imuHeading)) + imuGPS_Offset;
@@ -587,7 +613,7 @@ namespace AgOpenGPS
 
                         //grab the most current fix to last fix distance
                         distanceCurrentStepFix = glm.Distance(pn.fix, prevFix);
-
+// REGION ANTENNA OFFSET
                         #region Antenna Offset
 
                         if (vehicle.antennaOffset != 0)
@@ -596,7 +622,7 @@ namespace AgOpenGPS
                             pn.fix.northing = (Math.Sin(-fixHeading) * vehicle.antennaOffset) + pn.fix.northing;
                         }
                         #endregion
-
+// FIN REGION ANTENNA OFFSET
                         uncorrectedEastingGraph = pn.fix.easting;
 
                         //an IMU with heading correction, add the correction
@@ -647,7 +673,7 @@ namespace AgOpenGPS
                             camHeading = glm.toDegrees(camHeading);
                         }
 
-
+// REGION ROLL ----------------------------------------------------------------------------------------------------
                         #region Roll
 
                         if (ahrs.imuRoll != 88888)
@@ -663,7 +689,9 @@ namespace AgOpenGPS
                         }
 
                         #endregion Roll
+// END REGION ROLL ----------------------------------------------------------------------------------------------------
 
+// FUNCION TheRest !?!?!?
                         TheRest();
 
                         //most recent fixes are now the prev ones
@@ -761,7 +789,8 @@ namespace AgOpenGPS
                 fixHeading-= glm.twoPI;
 
             #endregion
-
+//FIN HEADING REGION -----------------------------------------------------------------------------------
+//REGION CORRECTED POSITION FOR GPS_OUT ----------------------------------------------------------------
             #region Corrected Position for GPS_OUT
 
             double rollCorrectedLat;
@@ -782,7 +811,9 @@ namespace AgOpenGPS
             SendPgnToLoop(pgnRollCorrectedLatLon);
 
             #endregion
+//FIN REGION CORRECTED POSITION FOR GPS_OUT ------------------------------------------------------------
 
+//REGION AUTOSTEER -------------------------------------------------------------------------------------
             #region AutoSteer
 
             //preset the values
@@ -973,7 +1004,8 @@ namespace AgOpenGPS
             }
 
             #endregion
-
+//FIN REGION AUTOSTEER ---------------------------------------------------------------------------------
+//REGION YOUTURN ---------------------------------------------------------------------------------------
             #region Youturn
 
             //if an outer boundary is set, then apply critical stop logic
@@ -1083,7 +1115,7 @@ namespace AgOpenGPS
             }
 
             #endregion
-
+//FIN REGION YOUTURN
             //update main window
             oglMain.MakeCurrent();
             oglMain.Refresh();

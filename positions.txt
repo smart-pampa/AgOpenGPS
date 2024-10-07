@@ -1,0 +1,113 @@
+Positions.designer.cs
+
+public void UpdatePositionFix()
+        1. Heading
+            1.1 Start
+            1.2 Offset Roll
+            1.3 Fix Heading
+            1.4 IMU Fusion
+            1.5 Camera
+            1.6 Antenna Offset
+            1.7 Roll
+        2. Corrected Position for GPS_OUT
+        3. AutoSteer
+        4. Youturn
+
+Variables y objetos
+    swFrame - System.Diagnostics.Stopwatch
+        Un cronómetro que mide el tiempo transcurrido entre las actualizaciones de la posición GPS. 
+        Se utiliza para calcular la frecuencia de las actualizaciones.
+
+    timeSliceOfLastFix - double
+        Almacena el tiempo transcurrido entre la última actualización GPS en función de los ticks del cronómetro (ElapsedTicks).
+
+    nowHz - double
+        Calcula la frecuencia actual de las actualizaciones GPS (en Hz) a partir de timeSliceOfLastFix.
+
+    gpsHz - double
+        Se utiliza un filtro complementario para suavizar las fluctuaciones en la frecuencia GPS.
+
+    startCounter - int
+        Contador de inicialización que se incrementa en cada actualización.
+
+    isGPSPositionInitialized - bool
+        Bandera que indica si las primeras posiciones GPS han sido inicializadas.
+
+    pn - Objeto de tipo Position
+        Contiene datos de posición y velocidad actual del GPS. Se accede a propiedades como fix (posición actual) y vtgSpeed (velocidad).
+
+    fd (Objeto) - Indefinido ¿?
+        Almacena datos relacionados con la distancia recorrida por el usuario. 
+        Contiene la variable distanceUser que se actualiza con la distancia recorrida.
+
+    prevDistFix - Que tipo es?
+        Almacena la posición previa del GPS para calcular la distancia recorrida.
+
+    distanceCurrentStepFixDisplay - double
+        Descripción: Distancia entre la posición anterior (prevDistFix) y la nueva posición GPS, convertida a un valor visual 
+        para la interfaz.
+
+    stepFixPts - Array Objetos
+        Almacena varias posiciones GPS anteriores para calcular la dirección y realizar correcciones.
+
+    gpsHeading - double
+        Dirección calculada en base a la diferencia entre posiciones GPS sucesivas. En radianes.
+
+    fixHeading - double
+        Dirección final corregida, que combina los datos del GPS y la IMU.
+
+    ahrs - Objeto (posiblemente una clase AHRS)
+        Unidad de Medición Inercial (IMU) que proporciona datos de orientación como imuHeading (cabeceo), 
+        imuRoll (inclinación), y otros. También contiene la variable imuGPS_Offset, que corrige la discrepancia entre los datos del GPS 
+        y la IMU.
+
+    imuCorrected - double
+        Dirección corregida después de fusionar los datos de la IMU y del GPS.
+
+    rollCorrectionDistance - double
+        Corregido de la distancia por el efecto del "roll" (inclinación lateral) del vehículo, calculado en 
+        función del ángulo de inclinación (imuRoll).
+
+    vehicle - Objeto (posiblemente una clase Vehicle)
+        Representa el vehículo, contiene propiedades como antennaOffset (desplazamiento de la antena GPS) 
+        y antennaHeight (altura de la antena), que se utilizan para corregir la posición GPS basada en la geometría del vehículo.
+
+    uncorrectedEastingGraph - double
+        Almacena la coordenada "Easting" no corregida antes de aplicar las correcciones de la inclinación y la antena.
+
+    prevFix - Estructura o Clase (posiblemente Position)
+        Almacena la posición GPS previa para calcular distancias y direcciones en la próxima actualización.
+
+    minHeadingStepDist - double
+        Distancia mínima entre puntos consecutivos para calcular un nuevo rumbo.
+
+    fixToFixHeadingDistance - double
+        Distancia calculada entre dos posiciones sucesivas para determinar si hay un cambio significativo en la dirección.
+
+    delta - double
+        Diferencia de ángulo entre el nuevo rumbo y el anterior, utilizada para verificar si el vehículo está cambiando de dirección.
+
+    camera - Objeto (posiblemente una clase Camera)
+        Utilizado para ajustar la dirección de la cámara en función de los cambios de rumbo del vehículo.
+
+    camHeading - double
+        Dirección de la cámara, ajustada según la dirección calculada del vehículo.
+
+    smoothCamHeading - double
+        Direccionamiento suavizado de la cámara, utilizado para evitar movimientos bruscos.
+
+    guidanceLineDistanceOff - double
+        Distancia entre el vehículo y la línea de guía de auto-conducción.
+
+    trk - Objeto (posiblemente Track)
+        Objeto que contiene datos y métodos relacionados con las líneas de guía de auto-conducción. 
+        Utilizado para la navegación automática.
+
+    p_254 - (Objeto) Arreglo de bytes
+        Almacena el mensaje PGN que se envía al módulo de auto-dirección, con parámetros como velocidad, ángulo de dirección, y estatus.
+
+    crossTrackError - int
+        Error promedio en la distancia entre el vehículo y la línea de guía de auto-conducción.
+
+    yt - Objeto (posiblemente YouTurn)
+        Representa las maniobras de giro automático (YouTurn) para el vehículo.
